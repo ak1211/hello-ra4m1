@@ -1,5 +1,4 @@
-# hello-ra4m1
-[Waveshare RA4M1-Zero Mini Development Board](https://www.waveshare.com/ra4m1-zero.htm) をRustでプログラムしてみる。
+[Waveshare RA4M1-Zero Mini Development Board](https://www.waveshare.com/ra4m1-zero.htm) のsmart ledを色を変えながら点灯させる。
 
 ## ビルド方法
 Windows 11のPowerShell 上で以下のコマンドでビルドする。
