@@ -7,6 +7,7 @@
 #![no_std]
 #![no_main]
 
+use cortex_m::delay::Delay;
 use panic_halt as _;
 use ra4m1_fsp_pac as pac;
 use scopeguard::defer;
@@ -14,16 +15,16 @@ use scopeguard::defer;
 // クロック設定
 // 16MHz水晶発振子をメインクロックに設定する
 #[allow(dead_code)]
-fn clock_init_xtal(system: &pac::SYSTEM, p: &pac::Peripherals) {
+fn clock_init_xtal(p: &pac::Peripherals) {
     // 保護レジスタを操作して書込み許可を与える
-    system.prcr().write(|w| {
+    p.SYSTEM.prcr().write(|w| {
         w.prkey().set(0xa5);
         w.prc0().set_bit(); // クロック発生回路関連レジスタに書込み許可を与える
         w.prc1().set_bit() // 低消費電力モード関連レジスタに書込み許可を与える
     });
     // 関数脱出時に保護レジスタを元通りに復帰する
     defer! {
-        system.prcr().write(|w| {
+        p.SYSTEM.prcr().write(|w| {
             w.prkey().set(0xa5);
             w.prc0().clear_bit();
             w.prc1().clear_bit()
@@ -31,35 +32,35 @@ fn clock_init_xtal(system: &pac::SYSTEM, p: &pac::Peripherals) {
     }
 
     // 消費電力モードはハイスピードモードに設定
-    system.opccr().write(|w| w.opcm()._00());
-    while !system.opccr().read().opcmtsf().bit_is_clear() {} // 確認
+    p.SYSTEM.opccr().write(|w| w.opcm()._00());
+    while !p.SYSTEM.opccr().read().opcmtsf().bit_is_clear() {} // 確認
 
     // サブクロックの停止
-    system.sosccr().write(|w| w.sostp().set_bit()); // サブクロックの停止
-    while !system.sosccr().read().sostp().bit_is_set() {} // サブクロック停止確認
+    p.SYSTEM.sosccr().write(|w| w.sostp().set_bit()); // サブクロックの停止
+    while !p.SYSTEM.sosccr().read().sostp().bit_is_set() {} // サブクロック停止確認
 
     // メインクロック発振器(MOSC)の停止
-    system.mosccr().write(|w| w.mostp()._1());
-    while !system.mosccr().read().mostp().is_1() {} // 確認
+    p.SYSTEM.mosccr().write(|w| w.mostp()._1());
+    while !p.SYSTEM.mosccr().read().mostp().is_1() {} // 確認
 
     // メインクロック発振器(MOSC)モードコントロールレジスタ
-    system.momcr().write(|w| {
+    p.SYSTEM.momcr().write(|w| {
         w.modrv1()._0(); // 10MHz ～ 20MHz
         w.mosel()._0() // 外部水晶発振子
     });
 
     // メインクロック発振器(MOSC)待機時間
-    system.moscwtcr().write(|w| w.msts()._1001()); // 32768us
+    p.SYSTEM.moscwtcr().write(|w| w.msts()._1001()); // 32768us
 
     // メインクロック発振器(MOSC)動作
-    system.mosccr().write(|w| w.mostp()._0());
-    while !system.mosccr().read().mostp().is_0() {} // 確認
+    p.SYSTEM.mosccr().write(|w| w.mostp()._0());
+    while !p.SYSTEM.mosccr().read().mostp().is_0() {} // 確認
 
     // メインクロック発振器(MOSC)発振安定待ち
-    while !system.oscsf().read().moscsf().bit_is_set() {}
+    while !p.SYSTEM.oscsf().read().moscsf().bit_is_set() {}
 
     // 分周器設定
-    system.sckdivcr().write(|w| {
+    p.SYSTEM.sckdivcr().write(|w| {
         w.ick()._000(); // システムクロック(ICLK Div /1)
         w.pcka()._000(); // 周辺モジュールクロックA(PCLKA Div /1)
         w.pckb()._000(); // 周辺モジュールクロックB(PCLKA Div /1)
@@ -69,8 +70,8 @@ fn clock_init_xtal(system: &pac::SYSTEM, p: &pac::Peripherals) {
     });
 
     // システムクロックをメインクロックに切り替え
-    system.sckscr().write(|w| w.cksel()._011()); // メインクロック発振器(MOSC)
-    while !system.sckscr().read().cksel().is_011() {} // 確認
+    p.SYSTEM.sckscr().write(|w| w.cksel()._011()); // メインクロック発振器(MOSC)
+    while !p.SYSTEM.sckscr().read().cksel().is_011() {} // 確認
 
     // フラッシュキャッシュ
     p.FCACHE.fcacheiv().write(|w| w.fcacheiv()._1()); // フラッシュキャッシュインバリデート
@@ -82,16 +83,16 @@ fn clock_init_xtal(system: &pac::SYSTEM, p: &pac::Peripherals) {
 // クロック設定
 // 16MHz水晶発振子を12逓倍のち4分周した48MHzをクロックに設定する
 #[allow(dead_code)]
-fn clock_init_pll48(system: &pac::SYSTEM, p: &pac::Peripherals) {
+fn clock_init_pll48(p: &pac::Peripherals) {
     // 保護レジスタを操作して書込み許可を与える
-    system.prcr().write(|w| {
+    p.SYSTEM.prcr().write(|w| {
         w.prkey().set(0xa5);
         w.prc0().set_bit(); // クロック発生回路関連レジスタに書込み許可を与える
         w.prc1().set_bit() // 低消費電力モード関連レジスタに書込み許可を与える
     });
     // 関数脱出時に保護レジスタを元通りに復帰する
     defer! {
-        system.prcr().write(|w| {
+        p.SYSTEM.prcr().write(|w| {
             w.prkey().set(0xa5);
             w.prc0().clear_bit();
             w.prc1().clear_bit()
@@ -99,53 +100,53 @@ fn clock_init_pll48(system: &pac::SYSTEM, p: &pac::Peripherals) {
     }
 
     // 消費電力モードはハイスピードモードに設定
-    system.opccr().write(|w| w.opcm()._00());
-    while !system.opccr().read().opcmtsf().bit_is_clear() {} // 確認
+    p.SYSTEM.opccr().write(|w| w.opcm()._00());
+    while !p.SYSTEM.opccr().read().opcmtsf().bit_is_clear() {} // 確認
 
     // サブクロックの停止
-    system.sosccr().write(|w| w.sostp().set_bit()); // サブクロックの停止
-    while !system.sosccr().read().sostp().bit_is_set() {} // サブクロック停止確認
+    p.SYSTEM.sosccr().write(|w| w.sostp().set_bit()); // サブクロックの停止
+    while !p.SYSTEM.sosccr().read().sostp().bit_is_set() {} // サブクロック停止確認
 
     // メインクロック発振器(MOSC)の停止
-    system.mosccr().write(|w| w.mostp()._1());
-    while !system.mosccr().read().mostp().is_1() {} // 確認
+    p.SYSTEM.mosccr().write(|w| w.mostp()._1());
+    while !p.SYSTEM.mosccr().read().mostp().is_1() {} // 確認
 
     //
     // メインクロック発振器(MOSC)の入力は16MHz水晶発振子
     //
 
     // メインクロック発振器(MOSC)モードコントロールレジスタ
-    system.momcr().write(|w| {
+    p.SYSTEM.momcr().write(|w| {
         w.modrv1()._0(); // 10MHz ～ 20MHz
         w.mosel()._0() // 外部水晶発振子
     });
 
     // メインクロック発振器(MOSC)待機時間
-    system.moscwtcr().write(|w| w.msts()._1001()); // 32768us
+    p.SYSTEM.moscwtcr().write(|w| w.msts()._1001()); // 32768us
 
     // メインクロック発振器(MOSC)動作
-    system.mosccr().write(|w| w.mostp()._0());
-    while !system.mosccr().read().mostp().is_0() {} // 確認
+    p.SYSTEM.mosccr().write(|w| w.mostp()._0());
+    while !p.SYSTEM.mosccr().read().mostp().is_0() {} // 確認
 
     // メインクロック発振器(MOSC)発振安定待ち
-    while !system.oscsf().read().moscsf().bit_is_set() {}
+    while !p.SYSTEM.oscsf().read().moscsf().bit_is_set() {}
 
     // メインクロック発振器(MOSC)をPLLで逓倍する
     // 逓倍率および分周比の設定
-    system.pllccr2().write(|w| {
+    p.SYSTEM.pllccr2().write(|w| {
         w.pllmul().set(12 - 1); // PLL Mul x12
         w.plodiv()._10() // PLL Div /4
     });
 
     // PLL動作
-    system.pllcr().write(|w| w.pllstp()._0());
-    while !system.pllcr().read().pllstp().is_0() {} // 確認
+    p.SYSTEM.pllcr().write(|w| w.pllstp()._0());
+    while !p.SYSTEM.pllcr().read().pllstp().is_0() {} // 確認
 
     // PLL発振安定待ち
-    while !system.oscsf().read().pllsf().bit_is_set() {}
+    while !p.SYSTEM.oscsf().read().pllsf().bit_is_set() {}
 
     // 分周器設定
-    system.sckdivcr().write(|w| {
+    p.SYSTEM.sckdivcr().write(|w| {
         w.ick()._000(); // システムクロック(ICLK Div /1)
         w.pcka()._000(); // 周辺モジュールクロックA(PCLKA Div /1)
         w.pckb()._001(); // 周辺モジュールクロックB(PCLKA Div /2)
@@ -155,8 +156,8 @@ fn clock_init_pll48(system: &pac::SYSTEM, p: &pac::Peripherals) {
     });
 
     // システムクロックをPLLに切り替え
-    system.sckscr().write(|w| w.cksel()._101()); // PLL
-    while !system.sckscr().read().cksel().is_101() {} // 確認
+    p.SYSTEM.sckscr().write(|w| w.cksel()._101()); // PLL
+    while !p.SYSTEM.sckscr().read().cksel().is_101() {} // 確認
 
     // フラッシュキャッシュ
     p.FCACHE.fcacheiv().write(|w| w.fcacheiv()._1()); // フラッシュキャッシュインバリデート
@@ -166,18 +167,18 @@ fn clock_init_pll48(system: &pac::SYSTEM, p: &pac::Peripherals) {
 }
 
 // クロック設定
-// 高速オンチップオシレータ(HOCO)をメインクロックに設定する
+// 高速オンチップオシレータ(HOCO)を48MHzでメインクロックに設定する
 #[allow(dead_code)]
-fn clock_init_hoco(system: &pac::SYSTEM, p: &pac::Peripherals) {
+fn clock_init_hoco48(p: &pac::Peripherals) {
     // 保護レジスタを操作して書込み許可を与える
-    system.prcr().write(|w| {
+    p.SYSTEM.prcr().write(|w| {
         w.prkey().set(0xa5);
         w.prc0().set_bit(); // クロック発生回路関連レジスタに書込み許可を与える
         w.prc1().set_bit() // 低消費電力モード関連レジスタに書込み許可を与える
     });
     // 関数脱出時に保護レジスタを元通りに復帰する
     defer! {
-        system.prcr().write(|w| {
+        p.SYSTEM.prcr().write(|w| {
             w.prkey().set(0xa5);
             w.prc0().clear_bit();
             w.prc1().clear_bit()
@@ -185,33 +186,39 @@ fn clock_init_hoco(system: &pac::SYSTEM, p: &pac::Peripherals) {
     }
 
     // 消費電力モードはハイスピードモードに設定
-    system.opccr().write(|w| w.opcm()._00());
-    while !system.opccr().read().opcmtsf().bit_is_clear() {} // 確認
+    p.SYSTEM.opccr().write(|w| w.opcm()._00());
+    while !p.SYSTEM.opccr().read().opcmtsf().bit_is_clear() {} // 確認
 
     // サブクロックの停止
-    system.sosccr().write(|w| w.sostp().set_bit()); // サブクロックの停止
-    while !system.sosccr().read().sostp().bit_is_set() {} // サブクロック停止確認
+    p.SYSTEM.sosccr().write(|w| w.sostp().set_bit()); // サブクロックの停止
+    while !p.SYSTEM.sosccr().read().sostp().bit_is_set() {} // サブクロック停止確認
 
+    // 高速オンチップオシレータ(HOCO)48MHz指定
+    // HOCOCR2レジスタのアドレス: 0x4001_e037
+    // HOCO48MHz指定: 0b0010_0000
+    unsafe {
+        core::ptr::write_volatile(0x4001_e037 as *mut u32, 0b0010_0000);
+    }
     // 高速オンチップオシレータ(HOCO)クロック動作
-    system.hococr().write(|w| w.hcstp()._0());
-    while !system.hococr().read().hcstp().is_0() {} // 確認
+    p.SYSTEM.hococr().write(|w| w.hcstp()._0());
+    while !p.SYSTEM.hococr().read().hcstp().is_0() {} // 確認
 
     // 高速オンチップオシレータ(HOCO)クロック発振安定待ち
-    while !system.oscsf().read().hocosf().bit_is_set() {}
+    while !p.SYSTEM.oscsf().read().hocosf().bit_is_set() {}
 
     // 分周器設定
-    system.sckdivcr().write(|w| {
+    p.SYSTEM.sckdivcr().write(|w| {
         w.ick()._000(); // システムクロック(ICLK Div /1)
         w.pcka()._000(); // 周辺モジュールクロックA(PCLKA Div /1)
-        w.pckb()._000(); // 周辺モジュールクロックB(PCLKA Div /1)
+        w.pckb()._001(); // 周辺モジュールクロックB(PCLKA Div /2)
         w.pckc()._000(); // 周辺モジュールクロックC(PCLKA Div /1)
         w.pckd()._000(); // 周辺モジュールクロックD(PCLKA Div /1)
-        w.fck()._000() // Flashインターフェースクロック(FCLK Div /1)
+        w.fck()._001() // Flashインターフェースクロック(FCLK Div /2)
     });
 
     // システムクロックを高速オンチップオシレータ(HOCO)クロックに切り替え
-    system.sckscr().write(|w| w.cksel()._000()); // HOCOクロック
-    while !system.sckscr().read().cksel().is_000() {} // 確認
+    p.SYSTEM.sckscr().write(|w| w.cksel()._000()); // HOCOクロック
+    while !p.SYSTEM.sckscr().read().cksel().is_000() {} // 確認
 
     // フラッシュキャッシュ
     p.FCACHE.fcacheiv().write(|w| w.fcacheiv()._1()); // フラッシュキャッシュインバリデート
@@ -227,14 +234,12 @@ pub struct Rgb<T> {
     pub b: T,
 }
 
-fn ws2812b_reset(p: &pac::Peripherals, led_pin_bit: u16) {
+fn ws2812b_reset(p: &pac::Peripherals, delay: &mut Delay, led_pin_bit: u16) {
     // OUTPUT LOW LEVEL
     p.PORT1
         .podr()
         .modify(|r, w| unsafe { w.bits(r.bits() & !led_pin_bit) });
-    for _ in 0..1_000_000 {
-        cortex_m::asm::nop();
-    }
+    delay.delay_us(280);
 }
 
 fn ws2812b_write(p: &pac::Peripherals, led_pin_bit: u16, value: Rgb<u8>) {
@@ -264,13 +269,15 @@ fn ws2812b_write(p: &pac::Peripherals, led_pin_bit: u16, value: Rgb<u8>) {
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
-    let system = unsafe { pac::SYSTEM::steal() };
-
     // 周辺機能
     let p = pac::Peripherals::take().unwrap();
+    let syst = cortex_m::Peripherals::take().unwrap().SYST;
 
     // クロック設定
-    clock_init_pll48(&system, &p);
+    //clock_init_pll48(&p);
+    clock_init_hoco48(&p);
+
+    let mut delay = Delay::new(syst, 48_000_000);
 
     // PORT 106 = D6(WS2812B)
     // PORT 111 = D13(LED)
@@ -311,11 +318,9 @@ fn main() -> ! {
     // メインループ
     loop {
         for color in sequences {
-            ws2812b_reset(&p, led_pin_bit);
+            ws2812b_reset(&p, &mut delay, led_pin_bit);
             ws2812b_write(&p, led_pin_bit, color);
-            for _ in 0..1_000_000 {
-                cortex_m::asm::nop();
-            }
+            delay.delay_ms(1000);
         }
     }
 }
