@@ -199,9 +199,8 @@ fn clock_init_hoco48(p: &pac::Peripherals) {
     // 高速オンチップオシレータ(HOCO)48MHz指定
     // HOCOCR2レジスタのアドレス: 0x4001_e037
     // HOCO48MHz指定: 0b0010_0000
-    unsafe {
-        core::ptr::write_volatile(0x4001_e037 as *mut u32, 0b0010_0000);
-    }
+    unsafe { core::ptr::write_volatile(0x4001_e037 as *mut u8, 0b0010_0000) };
+
     // 高速オンチップオシレータ(HOCO)クロック動作
     p.SYSTEM.hococr().write(|w| w.hcstp()._0());
     while !p.SYSTEM.hococr().read().hcstp().is_0() {} // 確認
