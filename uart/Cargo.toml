@@ -1,0 +1,16 @@
+[package]
+name = "hello-ra4m1"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bbqueue = { version = "0.6.0", features = ["critical-section"] }
+cortex-m = { version = "0.7", features = [ "critical-section-single-core" ] }
+cortex-m-rt = { version = "0.7", features = [ "device" ] }
+critical-section = "1.2.0"
+defmt = "1.0.1"
+defmt-rtt = "1.1.0"
+heapless = "0.9.2"
+panic-probe = { version = "1.0.0", features = [ "print-defmt" ] }
+ra4m1-fsp-pac = { version = "0.1.10", features = [ "critical-section", "cortex-m-rt-device" ] }
+scopeguard = { version = "1.2.0", default-features = false }
